@@ -16,9 +16,10 @@ class DAQ:
 
         flow = ljm.eReadName(self.handle, system_config.FLOW)
 
-        # Convert
-        pt1 = (pt1_v - system_config.PT_OFFSET)*system_config.PT_SCALE
-        pt2 = (pt1_v - system_config.PT_OFFSET)*system_config.PT_SCALE
+        # Convert readings. Gauge -> absolute readings 
+        P_atm = 1.013 # atmospheric pressure in bar
+        pt1 = ((pt1_v - 0.5)*500/4)*0.06895 + P_atm# psi to bar
+        pt2 = ((pt2_v - 0.5)*500/4)*0.06895 + P_atm
 
         lc1 = (lc1_v - system_config.LC_OFFSET)*system_config.LC_SCALE
         lc2 = (lc2_v - system_config.LC_OFFSET)*system_config.LC_SCALE

@@ -36,36 +36,52 @@ class DAQWindow(QMainWindow):
         main_layout = QHBoxLayout()
         central.setLayout(main_layout)
 
-        # LEFT PANEL (Labels and LJ status)
+        # ----------- LEFT PANEL (Labels, LJ status) -------------
         left_layout = QVBoxLayout()
 
+        # Add image :)
+        logo_label = QLabel()
+        pixmap = QPixmap("images/pingu.png")
+        pixmap = pixmap.scaledToWidth(250, Qt.TransformationMode.SmoothTransformation)
+        logo_label.setPixmap(pixmap)
+        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        left_layout.addWidget(logo_label)
+
+        # Status box
         status_box = QGroupBox("Sensor Values")
         status_layout = QVBoxLayout()
         status_box.setLayout(status_layout)
 
         self.pt1_label = QLabel("PT1: -- bar")
         self.pt2_label = QLabel("PT2: -- bar")
-        self.lc1_label = QLabel("LC1: -- N")
-        self.lc2_label = QLabel("LC2: -- N")
-        self.flow_label = QLabel("Flow meter: -- g/s")
+        self.lc1_label = QLabel("LC1: -- kg")
+        self.lc2_label = QLabel("LC2: -- kg")
+        self.flow_label = QLabel("Flow meter: -- kg/s")
 
+        self.lj_status_label = QLabel("LabJack: UNKNOWN")
+        self.lj_status_label.setStyleSheet("color: orange; font-weight: bold")
+        
         status_layout.addWidget(self.pt1_label)
         status_layout.addWidget(self.pt2_label)
         status_layout.addWidget(self.lc1_label)
         status_layout.addWidget(self.lc2_label)
         status_layout.addWidget(self.flow_label)
 
+        status_layout.addWidget(self.lj_status_label)
+
         left_layout.addWidget(status_box)
         left_layout.addStretch()
 
         main_layout.addLayout(left_layout, 1)
 
-        # RIGHT PANEL (Graphs)
+        # --------- RIGHT PANEL (Graphs) -------------------
         right_layout = QVBoxLayout()
         main_layout.addLayout(right_layout, 3)
 
         # Pressure plot
         self.pressure_plot = pg.PlotWidget(title="Pressure")
+        self.pressure_plot.setLabel("left", "Pressure", units="bar")
+        self.pressure_plot.setLabel("bottom", "Time", units="s")
         self.pressure_curve1 = self.pressure_plot.plot(pen=pg.mkPen("r", width=2), name="PT1")
         self.pressure_curve2 = self.pressure_plot.plot(pen=pg.mkPen("g", width=2), name="PT2")
 
@@ -97,9 +113,10 @@ class DAQWindow(QMainWindow):
 
         self.pressure_plot.enableAutoRange(axis='y')
 
-
         # Load cell plot
         self.load_plot = pg.PlotWidget(title="Load Cells")
+        self.load_plot.setLabel("left", "Mass", units='kg')
+        self.load_plot.setLabel("bottom", 'Time', units='s')
         self.load_curve1 = self.load_plot.plot(pen=pg.mkPen("c", width=2), name="LC1")
         self.load_curve2 = self.load_plot.plot(pen=pg.mkPen("y", width=2), name="LC2")
 
@@ -133,6 +150,8 @@ class DAQWindow(QMainWindow):
 
         # Flow meter plot
         self.flow_plot = pg.PlotWidget(title="Flow Meter")
+        self.flow_plot.setLabel("left", "Flowrate", units="kg/s")
+        self.flow_plot.setLabel("bottom", "Time", units="s")
         self.flow_curve = self.flow_plot.plot(pen=pg.mkPen("c", width=2), name="Flow")
 
         flow_section = QHBoxLayout()
@@ -174,7 +193,18 @@ class DAQWindow(QMainWindow):
 
     def update_gui(self):
 
-        pt1, pt2, lc1, lc2, flow = self.daq.read_sensors()
+        try: 
+            pt1, pt2, lc1, lc2, flow = self.daq.read_sensors()
+
+            self.lj_status_label.setText("Labjack CONNECTED")
+            self.lj_status_label.setStyleSheet("color: #00E676; font-weight: bold")
+
+        except Exception as e:
+
+            self.lj_status_label.setText("LabJack DISCONNECTED")
+            self.lj_status_label.setStyleSheet("color: red; font-weight: bold")
+
+            return
         
         t = time.time() - self.start_time
         
@@ -197,6 +227,7 @@ class DAQWindow(QMainWindow):
             self.pt2_data = self.pt2_data[-MAX_POINTS:]
             self.lc1_data = self.lc1_data[-MAX_POINTS:]
             self.lc2_data = self.lc2_data[-MAX_POINTS:]
+            self.flow_data = self.flow_data[-MAX_POINTS:]
         
         # Write to CSV
         self.logger.write_row([pt1, pt2, lc1, lc2, flow])
