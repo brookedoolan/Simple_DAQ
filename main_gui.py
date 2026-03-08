@@ -8,7 +8,7 @@ from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QPixmap
 import pyqtgraph as pg
 
-from lj_connect_read import DAQ
+from labjack_read_write import DAQ
 from csv_logger import CSVLogger
 import system_config
 import time
