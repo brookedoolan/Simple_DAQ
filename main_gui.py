@@ -1,9 +1,9 @@
-from PyQt6.QtWidgets import ( 
-    QMainWindow, QHBoxLayout, QWidget,  
-    QVBoxLayout, QLabel, QPushButton, QGroupBox, 
-    QApplication, QStackedWidget, QTextEdit, QLineEdit, 
-    QCheckBox 
-) 
+from PyQt6.QtWidgets import (
+    QMainWindow, QHBoxLayout, QWidget,
+    QVBoxLayout, QLabel, QPushButton, QGroupBox,
+    QApplication, QStackedWidget, QTextEdit, QLineEdit,
+    QCheckBox
+)
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QPixmap
 import pyqtgraph as pg
@@ -22,7 +22,7 @@ class DAQWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("Flow Test GUI")
-        
+
         self.logger = CSVLogger(system_config.headers)
 
         self.logging_enabled = False # Log data initially off
@@ -40,6 +40,8 @@ class DAQWindow(QMainWindow):
 
         # ----------- LEFT PANEL (Labels, LJ status) -------------
         left_layout = QVBoxLayout()
+
+
 
         # Add image :)
         logo_label = QLabel()
@@ -76,18 +78,20 @@ class DAQWindow(QMainWindow):
         self.pt2_label = QLabel("PT2: -- bar")
         self.lc1_label = QLabel("LC1: -- kg")
         self.lc2_label = QLabel("LC2: -- kg")
+        self.lc_total_label = QLabel("LC Total: -- kg")
         self.flow1_label = QLabel("Flow meter 1: -- kg/s")
         self.flow2_label = QLabel("Flow meter 2: -- kg/s")
 
         self.lj_status_label = QLabel("LabJack: UNKNOWN")
         self.lj_status_label.setStyleSheet("color: orange; font-weight: bold")
-        
+
         status_layout.addWidget(self.pt1_label)
         status_layout.addWidget(self.pt2_label)
         status_layout.addWidget(self.lc1_label)
         status_layout.addWidget(self.lc2_label)
         status_layout.addWidget(self.flow1_label)
         status_layout.addWidget(self.flow2_label)
+        status_layout.addWidget(self.lc_total_label)
 
         status_layout.addWidget(self.lj_status_label)
 
@@ -141,6 +145,7 @@ class DAQWindow(QMainWindow):
         self.load_plot.setLabel("bottom", 'Time', units='s')
         self.load_curve1 = self.load_plot.plot(pen=pg.mkPen("c", width=2), name="LC1")
         self.load_curve2 = self.load_plot.plot(pen=pg.mkPen("y", width=2), name="LC2")
+        self.load_curve_total = self.load_plot.plot(pen=pg.mkPen("b", width=2), name="LC_Total")
 
         load_cell_section = QHBoxLayout()
         load_cell_section.addWidget(self.load_plot, 4)
@@ -153,8 +158,12 @@ class DAQWindow(QMainWindow):
         self.lc2_checkbox = QCheckBox("LC2")
         self.lc2_checkbox.setChecked(True)
 
+        self.lc_total_checkbox = QCheckBox("LC_Total")
+        self.lc_total_checkbox.setChecked(True)
+
         legend_layout_LC.addWidget(self.lc1_checkbox)
         legend_layout_LC.addWidget(self.lc2_checkbox)
+        legend_layout_LC.addWidget(self.lc_total_checkbox)
 
         legend_layout_LC.addStretch()
 
@@ -168,6 +177,10 @@ class DAQWindow(QMainWindow):
             lambda state: self.load_curve2.setVisible(state == 2)
         )
 
+        self.lc_total_checkbox.stateChanged.connect(
+            lambda state: self.load_curve_total.setVisible(state == 2)
+        )
+
         self.load_plot.enableAutoRange(axis='y')
 
         # Flow meter plot
@@ -176,29 +189,32 @@ class DAQWindow(QMainWindow):
         self.flow_plot.setLabel("bottom", "Time", units="s")
         self.flow_curve1 = self.flow_plot.plot(pen=pg.mkPen("c", width=2), name="Flow1")
         self.flow_curve2 = self.flow_plot.plot(pen=pg.mkPen("b", width=2), name="Flow2")
+        self.flow_count1 = self.flow_plot.plot(pen=pg.mkPen("k", width=2), name="Flow1 RAW")
+        self.flow_count2 = self.flow_plot.plot(pen=pg.mkPen("y", width=2), name="Flow2 RAW")
 
         flow_section = QHBoxLayout()
         flow_section.addWidget(self.flow_plot,4)
         legend_layout_flow = QVBoxLayout()
         flow_section.addLayout(legend_layout_flow, 1)
 
-        self.flow_checkbox = QCheckBox("Flow1")
-        self.flow_checkbox.setChecked(True)
+        self.flow1_checkbox = QCheckBox("Flow1")
+        self.flow1_checkbox.setChecked(True)
 
-        self.flow_checkbox = QCheckBox("Flow2")
-        self.flow_checkbox.setChecked(True)
+        self.flow2_checkbox = QCheckBox("Flow2")
+        self.flow2_checkbox.setChecked(True)
 
-        legend_layout_flow.addWidget(self.flow_checkbox)
+        legend_layout_flow.addWidget(self.flow1_checkbox)
+        legend_layout_flow.addWidget(self.flow2_checkbox)
 
         legend_layout_flow.addStretch()
 
         right_layout.addLayout(flow_section)
 
-        self.flow_checkbox.stateChanged.connect(
+        self.flow1_checkbox.stateChanged.connect(
             lambda state: self.flow_curve1.setVisible(state == 2)
         )
 
-        self.flow_checkbox.stateChanged.connect(
+        self.flow2_checkbox.stateChanged.connect(
             lambda state: self.flow_curve2.setVisible(state == 2)
         )
 
@@ -214,9 +230,13 @@ class DAQWindow(QMainWindow):
 
         self.lc1_data = []
         self.lc2_data = []
+        self.lc_total_data = []
 
         self.flow1_data = []
         self.flow2_data = []
+
+        self.flow1_count_data = []
+        self.flow2_count_data = []
 
 
         # DAQ - Read labjacks
@@ -224,8 +244,8 @@ class DAQWindow(QMainWindow):
 
     def update_gui(self):
 
-        try: 
-            pt1, pt2, lc1, lc2, flow1, flow2 = self.daq.read_sensors()
+        try:
+            pt1, pt2, lc1, lc2, lc_total, flow1, flow2, flow1_count, flow2_count = self.daq.read_sensors()
             if self.daq.connected:
                 self.lj_status_label.setText("Labjack CONNECTED")
                 self.lj_status_label.setStyleSheet("color: #00E676; font-weight: bold")
@@ -241,21 +261,25 @@ class DAQWindow(QMainWindow):
             self.lj_status_label.setStyleSheet("color: red; font-weight: bold")
 
             return
-        
+
         t = time.time() - self.start_time
-        
-        # Append to current data storage 
+
+        # Append to current data storage
         self.time_data.append(t)
         self.pt1_data.append(pt1)
         self.pt2_data.append(pt2)
 
         self.lc1_data.append(lc1)
         self.lc2_data.append(lc2)
+        self.lc_total_data.append(lc_total)
 
         self.flow1_data.append(flow1)
         self.flow2_data.append(flow2)
 
-        # Limit data size 
+        self.flow1_count_data.append(flow1_count)
+        self.flow2_count_data.append(flow2_count)
+
+        # Limit data size
         MAX_POINTS = 1000
 
         if len(self.time_data) > MAX_POINTS:
@@ -264,12 +288,17 @@ class DAQWindow(QMainWindow):
             self.pt2_data = self.pt2_data[-MAX_POINTS:]
             self.lc1_data = self.lc1_data[-MAX_POINTS:]
             self.lc2_data = self.lc2_data[-MAX_POINTS:]
+            self.lc_total_data = self.lc_total_data[-MAX_POINTS:]
             self.flow1_data = self.flow1_data[-MAX_POINTS:]
             self.flow2_data = self.flow2_data[-MAX_POINTS:]
-        
+
+            self.flow1_count_data = self.flow1_count_data[-MAX_POINTS:]
+            self.flow2_count_data = self.flow2_count_data[-MAX_POINTS:]
+
+
         # Write to CSV (only if logging data enabled)
         if self.logging_enabled:
-            self.logger.write_row([pt1, pt2, lc1, lc2, flow1, flow2])
+            self.logger.write_row([pt1, pt2, lc1, lc2, lc_total, flow1, flow2])
 
         # Update plots
         self.pressure_curve1.setData(self.time_data, self.pt1_data)
@@ -277,16 +306,23 @@ class DAQWindow(QMainWindow):
 
         self.load_curve1.setData(self.time_data, self.lc1_data)
         self.load_curve2.setData(self.time_data, self.lc2_data)
+        self.load_curve_total.setData(self.time_data, self.lc_total_data)
 
         self.flow_curve1.setData(self.time_data, self.flow1_data)
         self.flow_curve2.setData(self.time_data, self.flow2_data)
+
+        self.flow_count1.setData(self.time_data, self.flow1_count_data)
+        self.flow_count2.setData(self.time_data, self.flow2_count_data)
+
+
 
         # Update data labels
         self.pt1_label.setText(f"PT1: {pt1:.2f} bar")
         self.pt2_label.setText(f"PT2: {pt2:.2f} bar")
 
-        self.lc1_label.setText(f"LC1: {lc1:.1f} N")
-        self.lc2_label.setText(f"LC2: {lc2:.1f} N")
+        self.lc1_label.setText(f"LC1: {lc1:.1f} kg")
+        self.lc2_label.setText(f"LC2: {lc2:.1f} kg")
+        self.lc_total_label.setText(f"LC Total: {lc_total:.1f} kg")
 
         self.flow1_label.setText(f"Flow meter: {flow1:.2f} kg/s")
         self.flow2_label.setText(f"Flow meter: {flow2:.2f} kg/s")
@@ -296,7 +332,7 @@ class DAQWindow(QMainWindow):
         self.start_log_button.setEnabled(False)
         self.stop_log_button.setEnabled(True)
         print("Logging started")
-    
+
     def stop_logging(self):
         self.logging_enabled = False
         self.start_log_button.setEnabled(True)
