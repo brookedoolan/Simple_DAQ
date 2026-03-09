@@ -32,25 +32,15 @@ class DAQ:
 
             # Flow meters
 
-            # FLOW 1 (FIO0)
             ljm.eWriteName(self.handle, "DIO0_EF_ENABLE", 0)
-            ljm.eWriteName(self.handle, "DIO0_EF_INDEX", 7)  # Counter
-            #ljm.eWriteName(self.handle, "DIO0_EF_ENABLE", 1)
+            ljm.eWriteName(self.handle, "DIO_EF_CLOCK0_ENABLE", 1)
+            ljm.eWriteName(self.handle, "DIO0_EF_INDEX", 3)
+            ljm.eWriteName(self.handle, "DIO0_EF_ENABLE", 1)
 
-            # FLOW 2 (FIO2)
-            ljm.eWriteName(self.handle, "DIO2_EF_ENABLE", 0)
-            ljm.eWriteName(self.handle, "DIO2_EF_INDEX", 7)
-            #ljm.eWriteName(self.handle, "DIO2_EF_ENABLE", 1)
+            # ljm.eWriteName(self.handle, "DIO2_EF_ENABLE", 0)
+            # ljm.eWriteName(self.handle, "DIO2_EF_INDEX", 3)
+            # ljm.eWriteName(self.handle, "DIO2_EF_ENABLE", 1)
 
-            # Reset counters
-            #ljm.eWriteName(self.handle, "DIO0_EF_READ_A_AND_RESET", 0)
-            #ljm.eWriteName(self.handle, "DIO2_EF_READ_A_AND_RESET", 0)
-
-            self.last_time = time.time()
-            self.last_flow1 = 0
-            self.last_flow2 = 0
-            self.flow1_pulses = 0
-            self.flow2_pulses = 0
 
         self.names = [
             system_config.PT1,
@@ -61,10 +51,14 @@ class DAQ:
             system_config.FLOW2
         ]
 
+        self.last_flow1 = None
+        self.last_flow2 = None
+
     # Labjack read tasks
     def read_sensors(self):
 
         if not self.connected:
+            assert False
             pt1 = 1.2 + random.uniform(-0.02, 0.02)
             pt2 = 1.1 + random.uniform(-0.02, 0.02)
             lc1 = random.uniform(0, 5)
@@ -73,15 +67,15 @@ class DAQ:
             flow1 = random.uniform(0, 10)
             flow2 = random.uniform(0, 10)
 
-            flow1_count = random.uniform(0, 10)
-            flow2_count = random.uniform(0, 10)
+            flow1 = random.uniform(0, 10)
+            flow2 = random.uniform(0, 10)
 
             lc_total = lc1 + lc2
 
-            return pt1, pt2, lc1, lc2, lc_total, flow1, flow2, flow1_count, flow2_count
+            return pt1, pt2, lc1, lc2, lc_total, flow1, flow2
 
         values = ljm.eReadNames(self.handle, len(self.names), self.names)
-        pt1_v, pt2_v, lc1_v, lc2_v, flow1_count, flow2_count = values
+        pt1_v, pt2_v, lc1_v, lc2_v, flow1_v, flow2_v = values
 
         # Convert readings. Gauge -> absolute readings
         P_atm = 1.013 # atmospheric pressure in bar
@@ -97,49 +91,36 @@ class DAQ:
         lc_total = 1098.6309573550288*lc_total - 11.092479241981106
         lc1 = lc2 = lc_total
 
-        # CALIBRATE
+        flow1 = flow1_v
+        flow2 = flow2_v
 
-        now = time.time()
-        dt = now - self.last_time
-        self.last_time = now
+        if flow1 == 0.0:
+            flow1 = self.last_flow1 if self.last_flow1 is not None else 0.0
+        self.last_flow1 = flow1
 
+        if flow2 == 0.0:
+            flow2 = self.last_flow2 if self.last_flow2 is not None else 0.0
+        self.last_flow2 = flow2
 
-        flow1_freq = (flow1_count - self.last_flow1)/dt
-        flow2_freq = (flow2_count - self.last_flow2)/dt
+        # Conv to grams to allow auto prefixing.
+        lc1 *= 1e3
+        lc2 *= 1e3
+        lc_total *= 1e3
 
-        self.last_flow1 = flow1_count
-        self.last_flow2 = flow2_count
+        flow1 = 1/max(flow1, 1e-6) # convert to Hz, avoid div by zero
+        flow2 = 1/max(flow2, 1e-6)
 
-        flow1_L_min = flow1_freq/11 # L/min
-        flow2_L_min = flow2_freq/11
+        flow1 /= 11 # Hz -> L/min
+        flow2 /= 11
 
-        flow1 = flow1_L_min/60 # L/min to kg/s
-        flow2 = flow2_L_min/60
+        flow1 *= 1e3/60 # L/min -> g/s
+        flow2 *= 1e3/60
 
-        """
-        # Manually counting
-        thresh = 0.5
-        if flow1_count > thresh and self.last_flow1 <= thresh:
-            self.flow1_pulses += 1
-        if flow2_count > thresh and self.last_flow2 <= thresh:
-            self.flow2_pulses += 1
+        flow1 = min(flow1, 100e3)
+        flow2 = min(flow2, 100e3)
+        flow2 = flow1
 
-        freq1 = self.flow1_pulses/dt
-        freq2 = self.flow2_pulses/dt
-
-        self.flow1_pulses = 0
-        self.flow2_pulses = 0
-
-        self.last_flow1 = flow1_count
-        self.last_flow2 = flow2_count
-
-        flow1_Lmin = freq1/11
-        flow2_Lmin = freq2/11
-
-        flow1 = flow1_Lmin/60
-        flow2 = flow2_Lmin/60
-        """
-        return pt1, pt2, lc1, lc2, lc_total, flow1, flow2, flow1_count, flow2_count
+        return pt1, pt2, lc1, lc2, lc_total, flow1, flow2
 
     # Labjack write tasks
     def set_valve(self, channel, state):

@@ -8,6 +8,8 @@ from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QPixmap
 import pyqtgraph as pg
 
+import numpy as np
+
 from labjack_read_write import DAQ
 from csv_logger import CSVLogger
 import system_config
@@ -76,11 +78,11 @@ class DAQWindow(QMainWindow):
 
         self.pt1_label = QLabel("PT1: -- bar")
         self.pt2_label = QLabel("PT2: -- bar")
-        self.lc1_label = QLabel("LC1: -- kg")
-        self.lc2_label = QLabel("LC2: -- kg")
-        self.lc_total_label = QLabel("LC Total: -- kg")
-        self.flow1_label = QLabel("Flow meter 1: -- kg/s")
-        self.flow2_label = QLabel("Flow meter 2: -- kg/s")
+        self.lc1_label = QLabel("LC1: -- g")
+        self.lc2_label = QLabel("LC2: -- g")
+        self.lc_total_label = QLabel("LC Total: -- g")
+        self.flow1_label = QLabel("Flow meter 1: -- g/s")
+        self.flow2_label = QLabel("Flow meter 2: -- g/s")
 
         self.lj_status_label = QLabel("LabJack: UNKNOWN")
         self.lj_status_label.setStyleSheet("color: orange; font-weight: bold")
@@ -108,6 +110,7 @@ class DAQWindow(QMainWindow):
         self.pressure_plot = pg.PlotWidget(title="Pressure")
         self.pressure_plot.setLabel("left", "Pressure", units="bar")
         self.pressure_plot.setLabel("bottom", "Time", units="s")
+        self.pressure_plot.setXRange(-60, 0)
         self.pressure_curve1 = self.pressure_plot.plot(pen=pg.mkPen("r", width=2), name="PT1")
         self.pressure_curve2 = self.pressure_plot.plot(pen=pg.mkPen("g", width=2), name="PT2")
 
@@ -141,8 +144,9 @@ class DAQWindow(QMainWindow):
 
         # Load cell plot
         self.load_plot = pg.PlotWidget(title="Load Cells")
-        self.load_plot.setLabel("left", "Mass", units='kg')
+        self.load_plot.setLabel("left", "Mass", units='g')
         self.load_plot.setLabel("bottom", 'Time', units='s')
+        self.load_plot.setXRange(-60, 0)
         self.load_curve1 = self.load_plot.plot(pen=pg.mkPen("c", width=2), name="LC1")
         self.load_curve2 = self.load_plot.plot(pen=pg.mkPen("y", width=2), name="LC2")
         self.load_curve_total = self.load_plot.plot(pen=pg.mkPen("b", width=2), name="LC_Total")
@@ -185,12 +189,11 @@ class DAQWindow(QMainWindow):
 
         # Flow meter plot
         self.flow_plot = pg.PlotWidget(title="Flow Meter")
-        self.flow_plot.setLabel("left", "Flowrate", units="kg/s")
+        self.flow_plot.setLabel("left", "Flowrate", units="g/s")
         self.flow_plot.setLabel("bottom", "Time", units="s")
+        self.flow_plot.setXRange(-60, 0)
         self.flow_curve1 = self.flow_plot.plot(pen=pg.mkPen("c", width=2), name="Flow1")
         self.flow_curve2 = self.flow_plot.plot(pen=pg.mkPen("b", width=2), name="Flow2")
-        self.flow_count1 = self.flow_plot.plot(pen=pg.mkPen("k", width=2), name="Flow1 RAW")
-        self.flow_count2 = self.flow_plot.plot(pen=pg.mkPen("y", width=2), name="Flow2 RAW")
 
         flow_section = QHBoxLayout()
         flow_section.addWidget(self.flow_plot,4)
@@ -224,7 +227,7 @@ class DAQWindow(QMainWindow):
         # Data storage
         self.start_time = time.time()
 
-        self.time_data = []
+        self.time_data = np.array([])
         self.pt1_data = []
         self.pt2_data = []
 
@@ -235,9 +238,6 @@ class DAQWindow(QMainWindow):
         self.flow1_data = []
         self.flow2_data = []
 
-        self.flow1_count_data = []
-        self.flow2_count_data = []
-
 
         # DAQ - Read labjacks
         self.daq = DAQ()
@@ -245,7 +245,7 @@ class DAQWindow(QMainWindow):
     def update_gui(self):
 
         try:
-            pt1, pt2, lc1, lc2, lc_total, flow1, flow2, flow1_count, flow2_count = self.daq.read_sensors()
+            pt1, pt2, lc1, lc2, lc_total, flow1, flow2 = self.daq.read_sensors()
             if self.daq.connected:
                 self.lj_status_label.setText("Labjack CONNECTED")
                 self.lj_status_label.setStyleSheet("color: #00E676; font-weight: bold")
@@ -262,10 +262,13 @@ class DAQWindow(QMainWindow):
 
             return
 
-        t = time.time() - self.start_time
+        now = time.time()
+        t = now - self.start_time
+        self.start_time = now
 
         # Append to current data storage
-        self.time_data.append(t)
+        self.time_data -= t
+        self.time_data = np.append(self.time_data, 0.0)
         self.pt1_data.append(pt1)
         self.pt2_data.append(pt2)
 
@@ -276,13 +279,10 @@ class DAQWindow(QMainWindow):
         self.flow1_data.append(flow1)
         self.flow2_data.append(flow2)
 
-        self.flow1_count_data.append(flow1_count)
-        self.flow2_count_data.append(flow2_count)
-
         # Limit data size
         MAX_POINTS = 1000
 
-        if len(self.time_data) > MAX_POINTS:
+        if len(self.time_data) > MAX_POINTS and False:
             self.time_data = self.time_data[-MAX_POINTS:]
             self.pt1_data = self.pt1_data[-MAX_POINTS:]
             self.pt2_data = self.pt2_data[-MAX_POINTS:]
@@ -291,9 +291,6 @@ class DAQWindow(QMainWindow):
             self.lc_total_data = self.lc_total_data[-MAX_POINTS:]
             self.flow1_data = self.flow1_data[-MAX_POINTS:]
             self.flow2_data = self.flow2_data[-MAX_POINTS:]
-
-            self.flow1_count_data = self.flow1_count_data[-MAX_POINTS:]
-            self.flow2_count_data = self.flow2_count_data[-MAX_POINTS:]
 
 
         # Write to CSV (only if logging data enabled)
@@ -311,21 +308,18 @@ class DAQWindow(QMainWindow):
         self.flow_curve1.setData(self.time_data, self.flow1_data)
         self.flow_curve2.setData(self.time_data, self.flow2_data)
 
-        self.flow_count1.setData(self.time_data, self.flow1_count_data)
-        self.flow_count2.setData(self.time_data, self.flow2_count_data)
-
 
 
         # Update data labels
         self.pt1_label.setText(f"PT1: {pt1:.2f} bar")
         self.pt2_label.setText(f"PT2: {pt2:.2f} bar")
 
-        self.lc1_label.setText(f"LC1: {lc1:.1f} kg")
-        self.lc2_label.setText(f"LC2: {lc2:.1f} kg")
-        self.lc_total_label.setText(f"LC Total: {lc_total:.1f} kg")
+        self.lc1_label.setText(f"LC1: {lc1:.1f} g")
+        self.lc2_label.setText(f"LC2: {lc2:.1f} g")
+        self.lc_total_label.setText(f"LC Total: {lc_total:.1f} g")
 
-        self.flow1_label.setText(f"Flow meter: {flow1:.2f} kg/s")
-        self.flow2_label.setText(f"Flow meter: {flow2:.2f} kg/s")
+        self.flow1_label.setText(f"Flow meter: {flow1:.2f} g/s")
+        self.flow2_label.setText(f"Flow meter: {flow2:.2f} g/s")
 
     def start_logging(self):
         self.logging_enabled = True
