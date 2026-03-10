@@ -38,7 +38,7 @@ df = df[(df["t_sec"] >= 89.5) & (df["t_sec"] <= 115)]
 fig, axs = plt.subplots(2, 1, sharex=True)
 
 # Flowmeter reading
-axs[0].plot(df["t_sec"], df["Flow1_kgs"], label="Flow metre")
+axs[0].plot(df["t_sec"], df["Flow1_kgs"], label="Flow meter")
 axs[0].set_ylabel("Flow1 (kg/s)")
 axs[0].set_title("Flow1 vs Time")
 axs[0].grid(True)
