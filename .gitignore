@@ -12,3 +12,9 @@ Thumbs.dbpp
 
 # vscode
 .vscode/
+
+# logeronis
+/logs
+
+# videos
+/videos

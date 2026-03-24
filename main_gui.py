@@ -98,9 +98,24 @@ class DAQWindow(QMainWindow):
         status_layout.addWidget(self.lj_status_label)
 
         left_layout.addWidget(status_box)
-        left_layout.addStretch()
+
+
+        # setpoint box
+        setpoint_box = QGroupBox("Setpoints")
+        setpoint_layout = QVBoxLayout()
+        setpoint_box.setLayout(setpoint_layout)
+        self.pt1_setpoint = QLineEdit()
+        self.pt2_setpoint = QLineEdit()
+        setpoint_layout.addWidget(QLabel("PT1 Setpoint (bar)"))
+        setpoint_layout.addWidget(self.pt1_setpoint)
+        setpoint_layout.addWidget(QLabel("PT2 Setpoint (bar)"))
+        setpoint_layout.addWidget(self.pt2_setpoint)
+        left_layout.addWidget(setpoint_box)
 
         main_layout.addLayout(left_layout, 1)
+        left_layout.addStretch()
+
+
 
         # --------- RIGHT PANEL (Graphs) -------------------
         right_layout = QVBoxLayout()
@@ -113,6 +128,8 @@ class DAQWindow(QMainWindow):
         self.pressure_plot.setXRange(-60, 0)
         self.pressure_curve1 = self.pressure_plot.plot(pen=pg.mkPen("r", width=2), name="PT1")
         self.pressure_curve2 = self.pressure_plot.plot(pen=pg.mkPen("g", width=2), name="PT2")
+        self.pressure_setpoint1 = self.pressure_plot.plot(pen=pg.mkPen("r", style=Qt.PenStyle.DashLine), name="PT1 Setpoint")
+        self.pressure_setpoint2 = self.pressure_plot.plot(pen=pg.mkPen("g", style=Qt.PenStyle.DashLine), name="PT2 Setpoint")
 
         pressure_section = QHBoxLayout()
         pressure_section.addWidget(self.pressure_plot, 4)
@@ -192,8 +209,8 @@ class DAQWindow(QMainWindow):
         self.flow_plot.setLabel("left", "Flowrate", units="g/s")
         self.flow_plot.setLabel("bottom", "Time", units="s")
         self.flow_plot.setXRange(-60, 0)
-        self.flow_curve1 = self.flow_plot.plot(pen=pg.mkPen("c", width=2), name="Flow1")
-        self.flow_curve2 = self.flow_plot.plot(pen=pg.mkPen("b", width=2), name="Flow2")
+        self.flow_curve1 = self.flow_plot.plot(pen=pg.mkPen("r", width=2), name="Flow1")
+        self.flow_curve2 = self.flow_plot.plot(pen=pg.mkPen("g", width=2), name="Flow2")
 
         flow_section = QHBoxLayout()
         flow_section.addWidget(self.flow_plot,4)
@@ -282,7 +299,7 @@ class DAQWindow(QMainWindow):
         # Limit data size
         MAX_POINTS = 1000
 
-        if len(self.time_data) > MAX_POINTS and False:
+        if len(self.time_data) > MAX_POINTS:
             self.time_data = self.time_data[-MAX_POINTS:]
             self.pt1_data = self.pt1_data[-MAX_POINTS:]
             self.pt2_data = self.pt2_data[-MAX_POINTS:]
@@ -309,6 +326,18 @@ class DAQWindow(QMainWindow):
         self.flow_curve2.setData(self.time_data, self.flow2_data)
 
 
+        # update setpoint lines
+        try:
+            pt1_setpoint = float(self.pt1_setpoint.text())
+            self.pressure_setpoint1.setData([-60, 0], [pt1_setpoint, pt1_setpoint])
+        except ValueError:
+            self.pressure_setpoint1.setData([], [])
+
+        try:
+            pt2_setpoint = float(self.pt2_setpoint.text())
+            self.pressure_setpoint2.setData([-60, 0], [pt2_setpoint, pt2_setpoint])
+        except ValueError:
+            self.pressure_setpoint2.setData([], [])
 
         # Update data labels
         self.pt1_label.setText(f"PT1: {pt1:.2f} bar")

@@ -31,15 +31,14 @@ class DAQ:
             ljm.eWriteName(self.handle, "AIN_ALL_SETTLING_US", 100)
 
             # Flow meters
+            ljm.eWriteName(self.handle, "DIO_EF_CLOCK0_ENABLE", 1)
 
             ljm.eWriteName(self.handle, "DIO0_EF_ENABLE", 0)
-            ljm.eWriteName(self.handle, "DIO_EF_CLOCK0_ENABLE", 1)
+            ljm.eWriteName(self.handle, "DIO1_EF_ENABLE", 0)
             ljm.eWriteName(self.handle, "DIO0_EF_INDEX", 3)
+            ljm.eWriteName(self.handle, "DIO1_EF_INDEX", 3)
             ljm.eWriteName(self.handle, "DIO0_EF_ENABLE", 1)
-
-            # ljm.eWriteName(self.handle, "DIO2_EF_ENABLE", 0)
-            # ljm.eWriteName(self.handle, "DIO2_EF_INDEX", 3)
-            # ljm.eWriteName(self.handle, "DIO2_EF_ENABLE", 1)
+            ljm.eWriteName(self.handle, "DIO1_EF_ENABLE", 1)
 
 
         self.names = [
@@ -51,8 +50,8 @@ class DAQ:
             system_config.FLOW2
         ]
 
-        self.last_flow1 = None
-        self.last_flow2 = None
+        self.last_flow1 = []
+        self.last_flow2 = []
 
     # Labjack read tasks
     def read_sensors(self):
@@ -79,7 +78,6 @@ class DAQ:
 
         # Convert readings. Gauge -> absolute readings
         P_atm = 1.013 # atmospheric pressure in bar
-        # CURRENTLY FOR 500 PSI SENSOR
         pt1 = ((pt1_v - 0.5)*150/4)*0.06895 + P_atm # psi to bar
         pt2 = ((pt2_v - 0.5)*150/4)*0.06895 + P_atm
 
@@ -88,37 +86,46 @@ class DAQ:
         lc2 = lc2_v*10000
 
         lc_total = lc1_v + lc2_v
-        lc_total = 1098.6309573550288*lc_total - 11.092479241981106
+        lc_total = 1098.6309573550288*lc_total - 11.092479241981106 + 0.34
         lc1 = lc2 = lc_total
 
         flow1 = flow1_v
         flow2 = flow2_v
 
         if flow1 == 0.0:
-            flow1 = self.last_flow1 if self.last_flow1 is not None else 0.0
-        self.last_flow1 = flow1
+            flow1 = self.last_flow1[-1] if self.last_flow1 else 0.0
+        self.last_flow1.append(flow1)
+        if len(self.last_flow1) > 15:
+            self.last_flow1.pop(0)
 
         if flow2 == 0.0:
-            flow2 = self.last_flow2 if self.last_flow2 is not None else 0.0
-        self.last_flow2 = flow2
+            flow2 = self.last_flow2[-1] if self.last_flow2 else 0.0
+        self.last_flow2.append(flow2)
+        if len(self.last_flow2) > 15:
+            self.last_flow2.pop(0)
+
+        # Check if flow has been the exact same for a while, if so
+        # assume it's actually zero.
+        if all(f == flow1 for f in self.last_flow1):
+            flow1 = 0.0
+        else:
+            flow1 = 1/max(flow1, 1e-6) # convert to Hz, avoid div by zero
+            flow1 /= 11 # Hz -> L/min
+            flow1 *= 1e3/60 # L/min -> g/s
+            flow1 = min(flow1, 100e3)
+        if all(f == flow2 for f in self.last_flow2):
+            flow2 = 0.0
+        else:
+            flow2 = 1/max(flow2, 1e-6) # convert to Hz, avoid div by zero
+            flow2 /= 11 # Hz -> L/min
+            flow2 *= 1e3/60 # L/min -> g/s
+            flow2 = min(flow2, 100e3)
 
         # Conv to grams to allow auto prefixing.
         lc1 *= 1e3
         lc2 *= 1e3
         lc_total *= 1e3
 
-        flow1 = 1/max(flow1, 1e-6) # convert to Hz, avoid div by zero
-        flow2 = 1/max(flow2, 1e-6)
-
-        flow1 /= 11 # Hz -> L/min
-        flow2 /= 11
-
-        flow1 *= 1e3/60 # L/min -> g/s
-        flow2 *= 1e3/60
-
-        flow1 = min(flow1, 100e3)
-        flow2 = min(flow2, 100e3)
-        flow2 = flow1
 
         return pt1, pt2, lc1, lc2, lc_total, flow1, flow2
 
