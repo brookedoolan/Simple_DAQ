@@ -43,8 +43,6 @@ class DAQWindow(QMainWindow):
         # ----------- LEFT PANEL (Labels, LJ status) -------------
         left_layout = QVBoxLayout()
 
-
-
         # Add image :)
         logo_label = QLabel()
         pixmap = QPixmap("images/pingu.png")
@@ -78,9 +76,9 @@ class DAQWindow(QMainWindow):
 
         self.pt1_label = QLabel("PT1: -- bar")
         self.pt2_label = QLabel("PT2: -- bar")
-        self.lc1_label = QLabel("LC1: -- g")
-        self.lc2_label = QLabel("LC2: -- g")
-        self.lc_total_label = QLabel("LC Total: -- g")
+        self.lctank_label = QLabel("LC_Tank: -- g")
+        self.lcthrust_label = QLabel("LC_Thrust: -- g")
+        #self.lc_total_label = QLabel("LC Total: -- g")
         self.flow1_label = QLabel("Flow meter 1: -- g/s")
         self.flow2_label = QLabel("Flow meter 2: -- g/s")
 
@@ -89,11 +87,11 @@ class DAQWindow(QMainWindow):
 
         status_layout.addWidget(self.pt1_label)
         status_layout.addWidget(self.pt2_label)
-        status_layout.addWidget(self.lc1_label)
-        status_layout.addWidget(self.lc2_label)
+        status_layout.addWidget(self.lctank_label)
+        status_layout.addWidget(self.lcthrust_label)
         status_layout.addWidget(self.flow1_label)
         status_layout.addWidget(self.flow2_label)
-        status_layout.addWidget(self.lc_total_label)
+        #status_layout.addWidget(self.lc_total_label)
 
         status_layout.addWidget(self.lj_status_label)
 
@@ -164,43 +162,43 @@ class DAQWindow(QMainWindow):
         self.load_plot.setLabel("left", "Mass", units='g')
         self.load_plot.setLabel("bottom", 'Time', units='s')
         self.load_plot.setXRange(-60, 0)
-        self.load_curve1 = self.load_plot.plot(pen=pg.mkPen("c", width=2), name="LC1")
-        self.load_curve2 = self.load_plot.plot(pen=pg.mkPen("y", width=2), name="LC2")
-        self.load_curve_total = self.load_plot.plot(pen=pg.mkPen("b", width=2), name="LC_Total")
+        self.load_curvetank = self.load_plot.plot(pen=pg.mkPen("c", width=2), name="LC_Tank")
+        self.load_curvethrust = self.load_plot.plot(pen=pg.mkPen("y", width=2), name="LC_Thrust")
+        #self.load_curve_total = self.load_plot.plot(pen=pg.mkPen("b", width=2), name="LC_Total")
 
         load_cell_section = QHBoxLayout()
         load_cell_section.addWidget(self.load_plot, 4)
         legend_layout_LC = QVBoxLayout()
         load_cell_section.addLayout(legend_layout_LC,1)
 
-        self.lc1_checkbox = QCheckBox("LC1")
-        self.lc1_checkbox.setChecked(True)
+        self.lctank_checkbox = QCheckBox("LC_Tank")
+        self.lctank_checkbox.setChecked(True)
 
-        self.lc2_checkbox = QCheckBox("LC2")
-        self.lc2_checkbox.setChecked(True)
+        self.lcthrust_checkbox = QCheckBox("LC_Thrust")
+        self.lcthrust_checkbox.setChecked(True)
 
-        self.lc_total_checkbox = QCheckBox("LC_Total")
-        self.lc_total_checkbox.setChecked(True)
+        #self.lc_total_checkbox = QCheckBox("LC_Total")
+        #self.lc_total_checkbox.setChecked(True)
 
-        legend_layout_LC.addWidget(self.lc1_checkbox)
-        legend_layout_LC.addWidget(self.lc2_checkbox)
-        legend_layout_LC.addWidget(self.lc_total_checkbox)
+        legend_layout_LC.addWidget(self.lctank_checkbox)
+        legend_layout_LC.addWidget(self.lcthrust_checkbox)
+        #legend_layout_LC.addWidget(self.lc_total_checkbox)
 
         legend_layout_LC.addStretch()
 
         right_layout.addLayout(load_cell_section)
 
-        self.lc1_checkbox.stateChanged.connect(
-            lambda state: self.load_curve1.setVisible(state == 2)
+        self.lctank_checkbox.stateChanged.connect(
+            lambda state: self.load_curvetank.setVisible(state == 2)
         )
 
-        self.lc2_checkbox.stateChanged.connect(
-            lambda state: self.load_curve2.setVisible(state == 2)
+        self.lcthrust_checkbox.stateChanged.connect(
+            lambda state: self.load_curvethrust.setVisible(state == 2)
         )
 
-        self.lc_total_checkbox.stateChanged.connect(
-            lambda state: self.load_curve_total.setVisible(state == 2)
-        )
+        #self.lc_total_checkbox.stateChanged.connect(
+        #    lambda state: self.load_curve_total.setVisible(state == 2)
+        #)
 
         self.load_plot.enableAutoRange(axis='y')
 
@@ -248,9 +246,9 @@ class DAQWindow(QMainWindow):
         self.pt1_data = []
         self.pt2_data = []
 
-        self.lc1_data = []
-        self.lc2_data = []
-        self.lc_total_data = []
+        self.lctank_data = []
+        self.lcthrust_data = []
+        #self.lc_total_data = []
 
         self.flow1_data = []
         self.flow2_data = []
@@ -262,7 +260,8 @@ class DAQWindow(QMainWindow):
     def update_gui(self):
 
         try:
-            pt1, pt2, lc1, lc2, lc_total, flow1, flow2 = self.daq.read_sensors()
+            pt1, pt2, lc_tank, lc_thrust, flow1, flow2 = self.daq.read_sensors()
+            #lc_total = lc_tank + lc_thrust
             if self.daq.connected:
                 self.lj_status_label.setText("Labjack CONNECTED")
                 self.lj_status_label.setStyleSheet("color: #00E676; font-weight: bold")
@@ -272,7 +271,7 @@ class DAQWindow(QMainWindow):
 
         except Exception as e:
 
-            print("ERROR:", e)
+            print(f"ERROR [{type(e).__name__}]: {e}")
 
             self.lj_status_label.setText("LabJack DISCONNECTED")
             self.lj_status_label.setStyleSheet("color: red; font-weight: bold")
@@ -289,9 +288,9 @@ class DAQWindow(QMainWindow):
         self.pt1_data.append(pt1)
         self.pt2_data.append(pt2)
 
-        self.lc1_data.append(lc1)
-        self.lc2_data.append(lc2)
-        self.lc_total_data.append(lc_total)
+        self.lctank_data.append(lc_tank)
+        self.lcthrust_data.append(lc_thrust)
+        #self.lc_total_data.append(lc_total)
 
         self.flow1_data.append(flow1)
         self.flow2_data.append(flow2)
@@ -303,24 +302,24 @@ class DAQWindow(QMainWindow):
             self.time_data = self.time_data[-MAX_POINTS:]
             self.pt1_data = self.pt1_data[-MAX_POINTS:]
             self.pt2_data = self.pt2_data[-MAX_POINTS:]
-            self.lc1_data = self.lc1_data[-MAX_POINTS:]
-            self.lc2_data = self.lc2_data[-MAX_POINTS:]
-            self.lc_total_data = self.lc_total_data[-MAX_POINTS:]
+            self.lctank_data = self.lctank_data[-MAX_POINTS:]
+            self.lcthrust_data = self.lcthrust_data[-MAX_POINTS:]
+            #self.lc_total_data = self.lc_total_data[-MAX_POINTS:]
             self.flow1_data = self.flow1_data[-MAX_POINTS:]
             self.flow2_data = self.flow2_data[-MAX_POINTS:]
 
 
         # Write to CSV (only if logging data enabled)
         if self.logging_enabled:
-            self.logger.write_row([pt1, pt2, lc1, lc2, lc_total, flow1, flow2])
+            self.logger.write_row([pt1, pt2, lc_tank, lc_thrust, flow1, flow2])
 
         # Update plots
         self.pressure_curve1.setData(self.time_data, self.pt1_data)
         self.pressure_curve2.setData(self.time_data, self.pt2_data)
 
-        self.load_curve1.setData(self.time_data, self.lc1_data)
-        self.load_curve2.setData(self.time_data, self.lc2_data)
-        self.load_curve_total.setData(self.time_data, self.lc_total_data)
+        self.load_curvetank.setData(self.time_data, self.lctank_data)
+        self.load_curvethrust.setData(self.time_data, self.lcthrust_data)
+        #self.load_curve_total.setData(self.time_data, self.lc_total_data)
 
         self.flow_curve1.setData(self.time_data, self.flow1_data)
         self.flow_curve2.setData(self.time_data, self.flow2_data)
@@ -343,9 +342,9 @@ class DAQWindow(QMainWindow):
         self.pt1_label.setText(f"PT1: {pt1:.2f} bar")
         self.pt2_label.setText(f"PT2: {pt2:.2f} bar")
 
-        self.lc1_label.setText(f"LC1: {lc1:.1f} g")
-        self.lc2_label.setText(f"LC2: {lc2:.1f} g")
-        self.lc_total_label.setText(f"LC Total: {lc_total:.1f} g")
+        self.lctank_label.setText(f"LC Tank: {lc_tank:.5f} g")
+        self.lcthrust_label.setText(f"LC Thrust: {lc_thrust:.5f} g")
+        #self.lc_total_label.setText(f"LC Total: {lc_total:.1f} g")
 
         self.flow1_label.setText(f"Flow meter: {flow1:.2f} g/s")
         self.flow2_label.setText(f"Flow meter: {flow2:.2f} g/s")

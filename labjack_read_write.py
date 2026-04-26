@@ -8,7 +8,7 @@ class DAQ:
 
     def __init__(self):
         try:
-            self.handle = ljm.openS("T7", "USB", "ANY")
+            self.handle = ljm.openS("T7", "ANY", "ANY")
             self.connected = True
             print("LabJack connected")
         except Exception as e:
@@ -17,13 +17,19 @@ class DAQ:
             self.handle = None
 
         if self.connected:
-            # Load cells
+            # Load cells 
+            # FOR DIFFERENTIAL INPUTS!!!
             # Configure differential load cell channel
-            ljm.eWriteName(self.handle, "AIN2_NEGATIVE_CH", 3)
-            ljm.eWriteName(self.handle, "AIN4_NEGATIVE_CH", 5)
+            #ljm.eWriteName(self.handle, "AIN0_NEGATIVE_CH", 1)
+            #ljm.eWriteName(self.handle, "AIN2_NEGATIVE_CH", 3)
             # Small range for better resolution
-            ljm.eWriteName(self.handle, "AIN2_RANGE", 0.01) # +/- 0.1V
-            ljm.eWriteName(self.handle, "AIN4_RANGE", 0.01)
+            #ljm.eWriteName(self.handle, "AIN1_RANGE", 0.01) # +/- 0.1V
+            #ljm.eWriteName(self.handle, "AIN3_RANGE", 0.01)
+
+            # FOR LJTICK INAMPS
+            for ch in [10, 11, 12, 13]:
+                ljm.eWriteName(self.handle, f"AIN{ch}_NEGATIVE_CH", 199)  # 199 = GND, single ended
+                ljm.eWriteName(self.handle, f"AIN{ch}_RANGE", 10) # +/- 10V
 
             # Higher resolution
             ljm.eWriteName(self.handle, "AIN_ALL_RESOLUTION_INDEX", 12)
@@ -46,6 +52,8 @@ class DAQ:
             system_config.PT2,
             system_config.LC1,
             system_config.LC2,
+            system_config.LC3,
+            system_config.LC4,
             system_config.FLOW1,
             system_config.FLOW2
         ]
@@ -62,6 +70,8 @@ class DAQ:
             pt2 = 1.1 + random.uniform(-0.02, 0.02)
             lc1 = random.uniform(0, 5)
             lc2 = random.uniform(0, 5)
+            lc3 = random.uniform(0, 5)
+            lc4 = random.uniform(0, 5)
 
             flow1 = random.uniform(0, 10)
             flow2 = random.uniform(0, 10)
@@ -69,12 +79,13 @@ class DAQ:
             flow1 = random.uniform(0, 10)
             flow2 = random.uniform(0, 10)
 
-            lc_total = lc1 + lc2
+            lc_tank = lc1 + lc2
+            lc_thrust = lc3 + lc4
 
-            return pt1, pt2, lc1, lc2, lc_total, flow1, flow2
+            return pt1, pt2, lc1, lc2, lc_tank, lc_thrust, flow1, flow2
 
         values = ljm.eReadNames(self.handle, len(self.names), self.names)
-        pt1_v, pt2_v, lc1_v, lc2_v, flow1_v, flow2_v = values
+        pt1_v, pt2_v, lc1_v, lc2_v, lc3_v, lc4_v, flow1_v, flow2_v = values
 
         # Convert readings. Gauge -> absolute readings
         P_atm = 1.013 # atmospheric pressure in bar
@@ -82,12 +93,28 @@ class DAQ:
         pt2 = ((pt2_v - 0.5)*150/4)*0.06895 + P_atm
 
         # CALIBRATE
-        lc1 = lc1_v*10000
-        lc2 = lc2_v*10000
+        # DIFFERENTIAL INPUTS
+        #lc1 = lc1_v*10000
+        #lc2 = lc2_v*10000
 
-        lc_total = lc1_v + lc2_v
-        lc_total = 1098.6309573550288*lc_total - 11.092479241981106 + 0.34
-        lc1 = lc2 = lc_total
+        #lc_total = lc1_v + lc2_v
+        #lc_total = 1098.6309573550288*lc_total - 11.092479241981106 + 0.34
+        #lc1 = lc2 = lc_total
+
+        # LJTICK INAMPS
+        #lc1_v = (lc1_v - 2.5)/11
+        #lc2_v = (lc2_v - 2.5)/11
+        #lc3_v = (lc3_v - 2.5)/11
+        #lc4_v = (lc4_v - 2.5)/11
+
+        # Calibrate **placeholder for now
+        lc1 = lc1_v
+        lc2 = lc2_v
+        lc3 = lc3_v
+        lc4 = lc4_v
+
+        lc_tank = lc1 + lc2
+        lc_thrust = 50.07437318918118*(lc3 + lc4) - 126.53793909098152
 
         flow1 = flow1_v
         flow2 = flow2_v
@@ -122,12 +149,12 @@ class DAQ:
             flow2 = min(flow2, 100e3)
 
         # Conv to grams to allow auto prefixing.
-        lc1 *= 1e3
-        lc2 *= 1e3
-        lc_total *= 1e3
+        #lc1 *= 1e3
+        #lc2 *= 1e3
+        #lc_total *= 1e3
 
 
-        return pt1, pt2, lc1, lc2, lc_total, flow1, flow2
+        return pt1, pt2, lc_tank, lc_thrust, flow1, flow2
 
     # Labjack write tasks
     def set_valve(self, channel, state):

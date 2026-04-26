@@ -3,6 +3,32 @@ import pandas as pd
 import numpy as np
 
 ## LINEAR REGR
+if True:
+    X = np.array([
+        2.5543,
+        2.5647,
+        2.5775,
+        2.5879,
+        2.5943,
+        2.6019,
+        2.6331
+    ])
+
+    Y = np.array([
+        1.387,
+        1.8833,
+        2.5051,
+        3.0137,
+        3.3938,
+        3.7745,
+        5.3092
+    ])
+
+    m, b = np.polyfit(X, Y, 1)
+    print(m, b)
+
+    quit()
+
 if False:
     X = 1e-4 * np.array([
         108.0635349,
