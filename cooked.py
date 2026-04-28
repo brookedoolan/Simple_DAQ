@@ -5,6 +5,26 @@ import numpy as np
 ## LINEAR REGR
 if True:
     X = np.array([
+        2.537,
+        2.5289,
+        2.5308,
+        2.53301
+    ])
+    
+    Y = np.array([
+        0.0,
+        1.3801,
+        1.8783,
+        2.4593
+    ])
+
+    m, b = np.polyfit(X, Y, 1)
+    print(m, b)
+
+    quit()
+
+if False:
+    X = np.array([
         2.5543,
         2.5647,
         2.5775,

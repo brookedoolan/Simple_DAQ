@@ -113,7 +113,7 @@ class DAQ:
         lc3 = lc3_v
         lc4 = lc4_v
 
-        lc_tank = lc1 + lc2
+        lc_tank = 264.23*(lc1 + lc2) - 666.83
         lc_thrust = 50.07437318918118*(lc3 + lc4) - 126.53793909098152
 
         flow1 = flow1_v
